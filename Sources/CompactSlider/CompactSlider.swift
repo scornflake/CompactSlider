@@ -64,7 +64,7 @@ import SwiftUI
 /// }
 /// ```
 public struct CompactSlider<Value: BinaryFloatingPoint, ValueLabel: View>: View {
-    
+
     @Environment(\.isEnabled) var isEnabled
     @Environment(\.compactSliderStyle) var compactSliderStyle
     @Environment(\.compactSliderDisabledHapticFeedback) var disabledHapticFeedback
@@ -81,9 +81,10 @@ public struct CompactSlider<Value: BinaryFloatingPoint, ValueLabel: View>: View 
     let enableDragGestureDelayForiOS: Bool
     @Binding var state: CompactSliderState
     private let valueLabel: ValueLabel
-    
+
     private var progressStep: Double = 0
     private var steps: Int = 0
+    private var onEditingChanged: ((Bool) -> Void)?
     @State private var isLowerValueChangingInternally = false
     @State private var isUpperValueChangingInternally = false
     @State var isHovering = false
@@ -92,7 +93,7 @@ public struct CompactSlider<Value: BinaryFloatingPoint, ValueLabel: View>: View 
     @State var upperProgress: Double = 0
     @State private var dragLocationX: CGFloat = 0
     @State var adjustedDragLocationX: (lower: CGFloat, upper: CGFloat) = (0, 0)
-    
+
     /// Creates a slider to select a value from a given bounds.
     ///
     /// The value of the created instance is equal to the position of the given value
@@ -111,16 +112,17 @@ public struct CompactSlider<Value: BinaryFloatingPoint, ValueLabel: View>: View 
     ///   - valueLabel: a `View` that describes the purpose of the instance.
     ///                 This view is contained in the `HStack` with central alignment.
     public init(
-        value: Binding<Value>,
-        in bounds: ClosedRange<Value> = 0...1,
-        step: Value = 0,
-        direction: CompactSliderDirection = .leading,
-        handleVisibility: HandleVisibility = .standard,
-        scaleVisibility: ScaleVisibility = .hovering,
-        minHeight: CGFloat = .compactSliderMinHeight,
-        enableDragGestureDelayForiOS: Bool = true,
-        state: Binding<CompactSliderState> = .constant(.inactive),
-        @ViewBuilder valueLabel: () -> ValueLabel
+            value: Binding<Value>,
+            in bounds: ClosedRange<Value> = 0...1,
+            step: Value = 0,
+            direction: CompactSliderDirection = .leading,
+            handleVisibility: HandleVisibility = .standard,
+            scaleVisibility: ScaleVisibility = .hovering,
+            minHeight: CGFloat = .compactSliderMinHeight,
+            enableDragGestureDelayForiOS: Bool = true,
+            state: Binding<CompactSliderState> = .constant(.inactive),
+            onEditingChanged: ((Bool) -> Void)? = nil,
+            @ViewBuilder valueLabel: () -> ValueLabel
     ) {
         _lowerValue = value
         _upperValue = .constant(0)
@@ -133,19 +135,22 @@ public struct CompactSlider<Value: BinaryFloatingPoint, ValueLabel: View>: View 
         self.minHeight = minHeight
         self.enableDragGestureDelayForiOS = enableDragGestureDelayForiOS
         _state = state
+        self.onEditingChanged = onEditingChanged
         self.valueLabel = valueLabel()
         let rangeLength = Double(bounds.length)
-        
-        guard rangeLength > 0 else { return }
-        
+
+        guard rangeLength > 0 else {
+            return
+        }
+
         _lowerProgress = State(wrappedValue: Double(value.wrappedValue - bounds.lowerBound) / rangeLength)
-        
+
         if step > 0 {
             progressStep = Double(step) / rangeLength
             steps = Int((rangeLength / Double(step)).rounded(.towardZero) - 1)
         }
     }
-    
+
     /// Creates a slider to select a range of values from a given bounds.
     ///
     /// Values of the created instance is equal to the position of the given value
@@ -164,16 +169,16 @@ public struct CompactSlider<Value: BinaryFloatingPoint, ValueLabel: View>: View 
     ///   - valueLabel: a `View` that describes the purpose of the instance.
     ///                 This view is contained in the `HStack` with central alignment.
     public init(
-        from lowerValue: Binding<Value>,
-        to upperValue: Binding<Value>,
-        in bounds: ClosedRange<Value> = 0...1,
-        step: Value = 0,
-        handleVisibility: HandleVisibility = .standard,
-        scaleVisibility: ScaleVisibility = .hovering,
-        minHeight: CGFloat = .compactSliderMinHeight,
-        enableDragGestureDelayForiOS: Bool = true,
-        state: Binding<CompactSliderState> = .constant(.inactive),
-        @ViewBuilder valueLabel: () -> ValueLabel
+            from lowerValue: Binding<Value>,
+            to upperValue: Binding<Value>,
+            in bounds: ClosedRange<Value> = 0...1,
+            step: Value = 0,
+            handleVisibility: HandleVisibility = .standard,
+            scaleVisibility: ScaleVisibility = .hovering,
+            minHeight: CGFloat = .compactSliderMinHeight,
+            enableDragGestureDelayForiOS: Bool = true,
+            state: Binding<CompactSliderState> = .constant(.inactive),
+            @ViewBuilder valueLabel: () -> ValueLabel
     ) {
         _lowerValue = lowerValue
         _upperValue = upperValue
@@ -188,74 +193,78 @@ public struct CompactSlider<Value: BinaryFloatingPoint, ValueLabel: View>: View 
         _state = state
         self.valueLabel = valueLabel()
         let rangeLength = Double(bounds.length)
-        
-        guard rangeLength > 0 else { return }
-        
+
+        guard rangeLength > 0 else {
+            return
+        }
+
         _lowerProgress = State(wrappedValue: Double(lowerValue.wrappedValue - bounds.lowerBound) / rangeLength)
         _upperProgress = State(wrappedValue: Double(upperValue.wrappedValue - bounds.lowerBound) / rangeLength)
-        
+
         if step > 0 {
             progressStep = Double(step) / rangeLength
             steps = Int((rangeLength / Double(step)).rounded(.towardZero) - 1)
         }
     }
-    
+
     public var body: some View {
         compactSliderStyle
-            .makeBody(
-                configuration: CompactSliderStyleConfiguration(
-                    direction: direction,
-                    isRangeValues: isRangeValues,
-                    isHovering: isHovering,
-                    isDragging: isDragging,
-                    lowerProgress: lowerProgress,
-                    upperProgress: upperProgress,
-                    label: .init(content: contentView)
+                .makeBody(
+                        configuration: CompactSliderStyleConfiguration(
+                                direction: direction,
+                                isRangeValues: isRangeValues,
+                                isHovering: isHovering,
+                                isDragging: isDragging,
+                                lowerProgress: lowerProgress,
+                                upperProgress: upperProgress,
+                                label: .init(content: contentView)
+                        )
                 )
-            )
-            #if os(macOS) || os(iOS)
-            .onHover {
-                isHovering = isEnabled && $0
-                updateState()
-            }
-            #endif
-            .dragGesture(
-                enableDragGestureDelayForiOS: enableDragGestureDelayForiOS,
-                onChanged: {
-                    isDragging = true
+                #if os(macOS) || os(iOS)
+                .onHover {
+                    isHovering = isEnabled && $0
                     updateState()
-                    dragLocationX = $0.location.x
-                }, onEnded: {
+                }
+                #endif
+                .dragGesture(
+                        enableDragGestureDelayForiOS: enableDragGestureDelayForiOS,
+                        onChanged: {
+                            isDragging = true
+                            onEditingChanged?(true)
+                            updateState()
+                            dragLocationX = $0.location.x
+                        }, onEnded: {
                     isDragging = false
+                    onEditingChanged?(false)
                     updateState()
                     dragLocationX = $0.location.x
                 }
-            )
-            .onChange(of: lowerProgress, perform: onLowerProgressChange)
-            .onChange(of: upperProgress, perform: onUpperProgressChange)
-            .onChange(of: lowerValue, perform: onLowerValueChange)
-            .onChange(of: upperValue, perform: onUpperValueChange)
-            .animation(nil, value: lowerValue)
-            .animation(nil, value: upperValue)
+                )
+                .onChange(of: lowerProgress, perform: onLowerProgressChange)
+                .onChange(of: upperProgress, perform: onUpperProgressChange)
+                .onChange(of: lowerValue, perform: onLowerValueChange)
+                .onChange(of: upperValue, perform: onUpperValueChange)
+                .animation(nil, value: lowerValue)
+                .animation(nil, value: upperValue)
     }
-    
+
     private var contentView: some View {
         ZStack {
             GeometryReader { proxy in
                 ZStack {
                     progressView(in: proxy.size)
-                    
+
                     if !handleVisibility.isHidden,
                        handleVisibility.isAlways || isHovering || isDragging {
                         progressHandleView(lowerProgress, size: proxy.size)
-                        
+
                         if !handleVisibility.isHidden, isRangeValues {
                             progressHandleView(upperProgress, size: proxy.size)
                         }
-                        
+
                         if isScaleVisible {
                             ScaleView(steps: steps)
-                                .frame(height: proxy.size.height, alignment: .top)
+                                    .frame(height: proxy.size.height, alignment: .top)
                         }
                     } else if isRangeValues, abs(upperProgress - lowerProgress) < 0.01 {
                         progressHandleView(lowerProgress, size: proxy.size)
@@ -263,27 +272,31 @@ public struct CompactSlider<Value: BinaryFloatingPoint, ValueLabel: View>: View 
                         progressHandleView(lowerProgress, size: proxy.size)
                     }
                 }
-                .frame(width: proxy.size.width, height: proxy.size.height)
-                .onChange(of: dragLocationX) { onDragLocationXChange($0, size: proxy.size) }
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .onChange(of: dragLocationX) {
+                            onDragLocationXChange($0, size: proxy.size)
+                        }
             }
-            
-            HStack { valueLabel }
-                .padding(.horizontal, .labelPadding)
+
+            HStack {
+                valueLabel
+            }
+                    .padding(.horizontal, .labelPadding)
         }
-        .opacity(isEnabled ? 1 : 0.5)
-        .frame(minHeight: minHeight)
-        .fixedSize(horizontal: false, vertical: true)
+                .opacity(isEnabled ? 1 : 0.5)
+                .frame(minHeight: minHeight)
+                .fixedSize(horizontal: false, vertical: true)
     }
-    
+
     private var isScaleVisible: Bool {
         if scaleVisibility == .hidden {
             return false
         }
-        
+
         if scaleVisibility == .always {
             return true
         }
-        
+
         return isHovering || isDragging
     }
 }
@@ -293,30 +306,31 @@ public struct CompactSlider<Value: BinaryFloatingPoint, ValueLabel: View>: View 
 private extension View {
     @ViewBuilder
     func dragGesture(
-        enableDragGestureDelayForiOS: Bool,
-        onChanged: @escaping (DragGesture.Value) -> Void,
-        onEnded: @escaping (DragGesture.Value) -> Void
+            enableDragGestureDelayForiOS: Bool,
+            onChanged: @escaping (DragGesture.Value) -> Void,
+            onEnded: @escaping (DragGesture.Value) -> Void
     ) -> some View {
-#if os(macOS)
+        #if os(macOS)
         gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged(onChanged)
-                .onEnded(onEnded)
+                DragGesture(minimumDistance: 0)
+                        .onChanged(onChanged)
+                        .onEnded(onEnded)
         )
-#else
+        #else
         delayedGesture(enableDragGestureDelayForiOS)
-            .gesture(
-                DragGesture(minimumDistance: 1)
-                    .onChanged(onChanged)
-                    .onEnded(onEnded)
-            )
-#endif
+                .gesture(
+                        DragGesture(minimumDistance: 1)
+                                .onChanged(onChanged)
+                                .onEnded(onEnded)
+                )
+        #endif
     }
 
     @ViewBuilder
     func delayedGesture(_ enableDragGestureDelayForiOS: Bool) -> some View {
         if enableDragGestureDelayForiOS {
-            onTapGesture {}
+            onTapGesture {
+            }
         } else {
             self
         }
@@ -324,42 +338,44 @@ private extension View {
 }
 
 private extension CompactSlider {
-    
+
     func onDragLocationXChange(_ newValue: CGFloat, size: CGSize) {
-        guard !bounds.isEmpty else { return }
-        
+        guard !bounds.isEmpty else {
+            return
+        }
+
         let newProgress = max(0, min(1, newValue / size.width))
         let isProgress2Nearest: Bool
-        
+
         // Check which progress is closest and should be in focus.
         if abs(upperProgress - lowerProgress) < 0.01 {
             isProgress2Nearest = newProgress > upperProgress
         } else {
             isProgress2Nearest = isRangeValues && abs(lowerProgress - newProgress) > abs(upperProgress - newProgress)
         }
-        
+
         guard progressStep > 0 else {
             if isProgress2Nearest {
                 if upperProgress != newProgress {
                     upperProgress = newProgress
-                    
+
                     if upperProgress == 1 {
                         HapticFeedback.vibrate(disabledHapticFeedback)
                     }
                 }
             } else if lowerProgress != newProgress {
                 lowerProgress = newProgress
-                
+
                 if lowerProgress == 0 || lowerProgress == 1 {
                     HapticFeedback.vibrate(disabledHapticFeedback)
                 }
             }
-            
+
             return
         }
-        
+
         let rounded = (newProgress / progressStep).rounded() * progressStep
-        
+
         if isProgress2Nearest {
             if rounded != upperProgress {
                 upperProgress = rounded
@@ -370,34 +386,42 @@ private extension CompactSlider {
             HapticFeedback.vibrate(disabledHapticFeedback)
         }
     }
-    
+
     func onLowerProgressChange(_ newValue: Double) {
         isLowerValueChangingInternally = true
         lowerValue = convertProgressToValue(newValue)
-        DispatchQueue.main.async { isLowerValueChangingInternally = false }
+        DispatchQueue.main.async {
+            isLowerValueChangingInternally = false
+        }
     }
-    
+
     func onUpperProgressChange(_ newValue: Double) {
         isUpperValueChangingInternally = true
         upperValue = convertProgressToValue(newValue)
-        DispatchQueue.main.async { isUpperValueChangingInternally = false }
+        DispatchQueue.main.async {
+            isUpperValueChangingInternally = false
+        }
     }
-    
+
     func convertProgressToValue(_ newValue: Double) -> Value {
         let value = bounds.lowerBound + Value(newValue) * bounds.length
         return step > 0 ? (value / step).rounded() * step : value
     }
-    
+
     func onLowerValueChange(_ newValue: Value) {
-        if isLowerValueChangingInternally { return }
+        if isLowerValueChangingInternally {
+            return
+        }
         lowerProgress = convertValueToProgress(newValue)
     }
-    
+
     func onUpperValueChange(_ newValue: Value) {
-        if isUpperValueChangingInternally { return }
+        if isUpperValueChangingInternally {
+            return
+        }
         upperProgress = convertValueToProgress(newValue)
     }
-    
+
     func convertValueToProgress(_ newValue: Value) -> Double {
         let length = Double(bounds.length)
         return length != 0 ? Double(newValue - bounds.lowerBound) / length : 0
@@ -419,13 +443,15 @@ public enum CompactSliderDirection {
 // MARK: - Range
 
 private extension ClosedRange where Bound: BinaryFloatingPoint {
-    var length: Bound { upperBound - lowerBound }
+    var length: Bound {
+        upperBound - lowerBound
+    }
 }
 
 // MARK: - Preview
 
 struct CompactSlider_Previews: PreviewProvider {
-    
+
     static var previews: some View {
         Group {
             ScrollView {
@@ -434,21 +460,21 @@ struct CompactSlider_Previews: PreviewProvider {
                     contentView
                 }
             }
-            .preferredColorScheme(.light)
-            
+                    .preferredColorScheme(.light)
+
             contentView.preferredColorScheme(.dark)
         }
-        .padding()
-        #if os(macOS)
-        .frame(height: 500)
-        #endif
+                .padding()
+                #if os(macOS)
+                .frame(height: 500)
+                #endif
     }
-    
+
     private static var contentView: some View {
         VStack(spacing: 16) {
             Text("CompactSlider")
-                .font(.title.bold())
-            
+                    .font(.title.bold())
+
             Group {
                 // 1. The default case.
                 CompactSlider(value: .constant(0.5)) {
@@ -456,7 +482,7 @@ struct CompactSlider_Previews: PreviewProvider {
                     Spacer()
                     Text("0.5")
                 }
-                
+
                 // Handle in the centre for better representation of negative values.
                 // 2.1. The value is 0, which should show the handle as there is no value to show.
                 CompactSlider(value: .constant(0.0), in: -1.0...1.0, direction: .center) {
@@ -464,41 +490,41 @@ struct CompactSlider_Previews: PreviewProvider {
                     Spacer()
                     Text("0.0")
                 }
-                
+
                 // 2.2. When the value is not 0, the value can be shown with a rectangle.
                 CompactSlider(value: .constant(0.3), in: -1.0...1.0, direction: .center) {
                     Text("Center -1.0...1.0")
                     Spacer()
                     Text("0.3")
                 }
-                
+
                 // 3. The value is filled in on the right-hand side.
                 CompactSlider(value: .constant(0.3), direction: .trailing) {
                     Text("Trailing")
                     Spacer()
                     Text("0.3")
                 }
-                
+
                 Divider()
-                
+
                 // 4. Set a range of values in specific step to change.
                 CompactSlider(value: .constant(70), in: 0...200, step: 10) {
                     Text("Snapped")
                     Spacer()
                     Text("70")
                 }
-                
+
                 // 4. Set a range of values in specific step to change from the center.
                 CompactSlider(value: .constant(0.0), in: -10...10, step: 1, direction: .center) {
                     Text("Center")
                     Spacer()
                     Text("0.0")
                 }
-                .compactSliderDisabledHapticFeedback(true)
+                        .compactSliderDisabledHapticFeedback(true)
             }
-            
+
             Divider()
-            
+
             // Prominent style.
             Group {
                 CompactSlider(value: .constant(0.5)) {
@@ -506,14 +532,14 @@ struct CompactSlider_Previews: PreviewProvider {
                     Spacer()
                     Text("0.5")
                 }
-                .compactSliderStyle(
-                    .prominent(
-                        lowerColor: .purple,
-                        upperColor: .pink,
-                        useGradientBackground: true
-                    )
-                )
-                
+                        .compactSliderStyle(
+                                .prominent(
+                                        lowerColor: .purple,
+                                        upperColor: .pink,
+                                        useGradientBackground: true
+                                )
+                        )
+
                 // Get the range of values.
                 VStack(spacing: 16) {
                     CompactSlider(from: .constant(0.4), to: .constant(0.7)) {
@@ -521,24 +547,24 @@ struct CompactSlider_Previews: PreviewProvider {
                         Spacer()
                         Text("0.2 - 0.7")
                     }
-                    
+
                     // Switch back to the `.default` style.
                     CompactSlider(from: .constant(0.4), to: .constant(0.7)) {
                         Text("Range")
                         Spacer()
                         Text("0.2 - 0.7")
                     }
-                    .compactSliderStyle(.default)
+                            .compactSliderStyle(.default)
                 }
-                .compactSliderStyle(
-                    .prominent(
-                        lowerColor: .green,
-                        upperColor: .yellow,
-                        useGradientBackground: true
-                    )
-                )
+                        .compactSliderStyle(
+                                .prominent(
+                                        lowerColor: .green,
+                                        upperColor: .yellow,
+                                        useGradientBackground: true
+                                )
+                        )
             }
-            
+
             Spacer()
         }
     }
