@@ -12,11 +12,19 @@ struct ProgressView: View {
     let width: CGFloat
     let offsetX: CGFloat
     let isFocused: Bool
-    
+
+    init(width: CGFloat, offsetX: CGFloat, isFocused: Bool) {
+        // check if width is nan, -ve, infinite. If so, don't set it
+        let validatedWidth = width.isFinite && width > 0 ? width : 0
+        self.width = validatedWidth
+        self.offsetX = offsetX
+        self.isFocused = isFocused
+    }
+
     var body: some View {
         Rectangle()
             .fill(isFocused ? secondaryAppearance.focusedProgressFillStyle : secondaryAppearance.progressFillStyle)
-            .frame(width: width)
+            .frame(width: max(0, width))
             .offset(x: offsetX)
     }
 }
